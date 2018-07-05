@@ -58,13 +58,12 @@ class LoadData:
                 # we expect the text file to contain the data in following format
                 # <RGB Image>, <Label Image>
                 line_arr = line.split(',')
-                img_file = ((self.data_dir).strip() + '/' + line_arr[0].strip()).strip()
-                label_file = ((self.data_dir).strip() + '/' + line_arr[1].strip()).strip()
+                img_file = line_arr[0].strip()
+                label_file = line_arr[1].strip()
                 label_img = cv2.imread(label_file, 0)
                 unique_values = np.unique(label_img)
                 max_val = max(unique_values)
                 min_val = min(unique_values)
-
                 max_val_al = max(max_val, max_val_al)
                 min_val_al = min(min_val, min_val_al)
 
@@ -90,7 +89,7 @@ class LoadData:
                 if max_val > (self.classes - 1) or min_val < 0:
                     print('Labels can take value between 0 and number of classes.')
                     print('Some problem with labels. Please check.')
-                    print('Label Image ID: ' + label_file)
+                    print('Label Image ID: ' + label_file + ' max_val: ' + str(max_val) + ' min_val: '+str(min_val))
                 no_files += 1
 
         if trainStg == True:

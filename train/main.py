@@ -7,6 +7,7 @@ from torch.autograd import Variable
 import VisualizeGraph as viz
 from Criteria import CrossEntropyLoss2d
 import torch.backends.cudnn as cudnn
+import torch.nn
 import Transforms as myTransforms
 import DataSet as myDataLoader
 import time
@@ -58,11 +59,15 @@ def val(args, val_loader, model, criterion):
         # compute the confusion matrix
         iouEvalVal.addBatch(output.max(1)[1].data, target_var.data)
 
-        print('[%d/%d] loss: %.3f time: %.2f' % (i, total_batches, loss.data[0], time_taken))
+        print('validation [%d/%d] loss: %.3f time: %.2f' % (i, total_batches, loss.data[0], time_taken))
+        if i > 4:
+            print("{} fits in memory!".format(val_loader))
+            # break
 
     average_epoch_loss_val = sum(epoch_loss) / len(epoch_loss)
 
     overall_acc, per_class_acc, per_class_iu, mIOU = iouEvalVal.getMetric()
+
 
     return average_epoch_loss_val, overall_acc, per_class_acc, per_class_iu, mIOU
 
@@ -82,7 +87,6 @@ def train(args, train_loader, model, criterion, optimizer, epoch):
     iouEvalTrain = iouEval(args.classes)
 
     epoch_loss = []
-
     total_batches = len(train_loader)
     for i, (input, target) in enumerate(train_loader):
         start_time = time.time()
@@ -112,6 +116,9 @@ def train(args, train_loader, model, criterion, optimizer, epoch):
         iouEvalTrain.addBatch(output.max(1)[1].data, target_var.data)
 
         print('[%d/%d] loss: %.3f time:%.2f' % (i, total_batches, loss.data[0], time_taken))
+        if epoch == 0 and i > 4:
+            print("{} fits in memory!".format(train_loader))
+            # break
 
     average_epoch_loss_train = sum(epoch_loss) / len(epoch_loss)
 
@@ -170,6 +177,8 @@ def trainValidateSegmentation(args):
         model = net.ESPNet(args.classes, p=p, q=q, encoderFile=args.pretrained)
         args.savedir = args.savedir + '_dec_' + str(p) + '_' + str(q) + '/'
 
+    # model = torch.nn.DataParallel(model)
+
     if args.onGPU:
         model = model.cuda()
 
@@ -205,7 +214,7 @@ def trainValidateSegmentation(args):
     print(data['classWeights'])
 
     #compose the data with transforms
-    trainDataset_main = myTransforms.Compose([
+    trainDataset_scale2 = myTransforms.Compose([
         myTransforms.Normalize(mean=data['mean'], std=data['std']),
         myTransforms.Scale(1024, 512),
         myTransforms.RandomCropResize(32),
@@ -215,19 +224,19 @@ def trainValidateSegmentation(args):
         #
     ])
 
-    trainDataset_scale1 = myTransforms.Compose([
-        myTransforms.Normalize(mean=data['mean'], std=data['std']),
-        myTransforms.Scale(1536, 768), # 1536, 768
-        myTransforms.RandomCropResize(100),
-        myTransforms.RandomFlip(),
-        #myTransforms.RandomCrop(64),
-        myTransforms.ToTensor(args.scaleIn),
-        #
-    ])
+    # trainDataset_scale1 = myTransforms.Compose([
+    #     myTransforms.Normalize(mean=data['mean'], std=data['std']),
+    #     myTransforms.Scale(1536, 768), # 1536, 768
+    #     myTransforms.RandomCropResize(100),
+    #     myTransforms.RandomFlip(),
+    #     #myTransforms.RandomCrop(64),
+    #     myTransforms.ToTensor(args.scaleIn),
+    #     #
+    # ])
 
-    trainDataset_scale2 = myTransforms.Compose([
+    trainDataset_main = myTransforms.Compose([
         myTransforms.Normalize(mean=data['mean'], std=data['std']),
-        myTransforms.Scale(1280, 720), # 1536, 768
+        # myTransforms.Scale(1280, 720), # 1536, 768
         myTransforms.RandomCropResize(100),
         myTransforms.RandomFlip(),
         #myTransforms.RandomCrop(64),
@@ -258,7 +267,7 @@ def trainValidateSegmentation(args):
 
     valDataset = myTransforms.Compose([
         myTransforms.Normalize(mean=data['mean'], std=data['std']),
-        myTransforms.Scale(1024, 512),
+        # myTransforms.Scale(1280, 720),
         myTransforms.ToTensor(args.scaleIn),
         #
     ])
@@ -268,15 +277,15 @@ def trainValidateSegmentation(args):
 
     trainLoader = torch.utils.data.DataLoader(
         myDataLoader.MyDataset(data['trainIm'], data['trainAnnot'], transform=trainDataset_main),
-        batch_size=args.batch_size + 2, shuffle=True, num_workers=args.num_workers, pin_memory=True)
-
-    trainLoader_scale1 = torch.utils.data.DataLoader(
-        myDataLoader.MyDataset(data['trainIm'], data['trainAnnot'], transform=trainDataset_scale1),
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+
+    # trainLoader_scale1 = torch.utils.data.DataLoader(
+    #     myDataLoader.MyDataset(data['trainIm'], data['trainAnnot'], transform=trainDataset_scale1),
+    #     batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
     trainLoader_scale2 = torch.utils.data.DataLoader(
         myDataLoader.MyDataset(data['trainIm'], data['trainAnnot'], transform=trainDataset_scale2),
-        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+        batch_size=args.batch_size + 2, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
     trainLoader_scale3 = torch.utils.data.DataLoader(
         myDataLoader.MyDataset(data['trainIm'], data['trainAnnot'], transform=trainDataset_scale3),
@@ -288,7 +297,7 @@ def trainValidateSegmentation(args):
 
     valLoader = torch.utils.data.DataLoader(
         myDataLoader.MyDataset(data['valIm'], data['valAnnot'], transform=valDataset),
-        batch_size=args.batch_size + 4, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+        batch_size=args.batch_size - 6, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
     if args.onGPU:
         cudnn.benchmark = True
@@ -332,7 +341,7 @@ def trainValidateSegmentation(args):
 
         # train for one epoch
         # We consider 1 epoch with all the training data (at different scales)
-        train(args, trainLoader_scale1, model, criteria, optimizer, epoch)
+        # train(args, trainLoader_scale1, model, criteria, optimizer, epoch)
         train(args, trainLoader_scale2, model, criteria, optimizer, epoch)
         train(args, trainLoader_scale4, model, criteria, optimizer, epoch)
         train(args, trainLoader_scale3, model, criteria, optimizer, epoch)
@@ -403,6 +412,7 @@ if __name__ == '__main__':
     parser.add_argument('--decoder', type=bool, default=False,help='True if ESPNet. False for ESPNet-C') # False for encoder
     parser.add_argument('--pretrained', default='../pretrained/encoder/espnet_p_2_q_8.pth', help='Pretrained ESPNet-C weights. '
                                                                               'Only used when training ESPNet')
+    parser.add_argument('--resumeLoc', default="meow")
     parser.add_argument('--p', default=2, type=int, help='depth multiplier')
     parser.add_argument('--q', default=8, type=int, help='depth multiplier')
 

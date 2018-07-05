@@ -10,8 +10,8 @@ import time
 from argparse import ArgumentParser
 
 pallete = [128, 64, 128,
-           244, 35, 232,
-           70, 70, 70,
+           10, 225, 10,
+           10, 10, 220,
            102, 102, 156,
            190, 153, 153,
            153, 153, 153,
@@ -62,8 +62,8 @@ def relabel(img):
 
 def evaluateModel(args, model, up, image_list):
     # gloabl mean and std values
-    mean = [72.3923111, 82.90893555, 73.15840149]
-    std = [45.3192215, 46.15289307, 44.91483307]
+    mean = [73.933304, 74.61563 , 71.06163 ]
+    std = [51.179474, 50.492702, 50.31186 ]
 
     for i, imgName in enumerate(image_list):
         input_img = cv2.imread(imgName).astype(np.float32)
@@ -74,10 +74,10 @@ def evaluateModel(args, model, up, image_list):
             img[:, :, j] /= std[j]
 
         # resize the image to 1024x512x3
-        img = cv2.resize(img, (1024, 512))
+        # img = cv2.resize(img, (1024, 512))
         orig_image = None
         if args.overlay:
-            orig_image = cv2.cvtColor(cv2.resize(input_img, (1024, 512)), cv2.COLOR_BGR2RGB)
+            orig_image = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
             orig_image = PILImage.fromarray(np.uint8(orig_image), "RGB")
 
         img /= 255
@@ -127,7 +127,7 @@ def main(args):
 
     p = args.p
     q = args.q
-    classes = 20
+    classes = 3
     if args.modelType == 2:
         modelA = Net.ESPNet_Encoder(classes, p, q)  # Net.Mobile_SegNetDilatedIA_C_stage1(20)
         model_weight_file = args.weightsDir + os.sep + 'encoder' + os.sep + 'espnet_p_' + str(p) + '_q_' + str(
